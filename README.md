@@ -14,5 +14,11 @@ of the Soloud crate, it keeps a constant connection to the headset.<br><br>
 So as soon as it detects a form of input (mouse click or keyboard press), it will make the object and starts a
 5 minute timer. After 5 minutes of no input, it set the object to None and allows the headset to shut off
 
+## How to install
+1. Go to releases and download the most recent patch
+2. Press Win+R and type "shell:startup"
+3. Place exectuable in that directory. This allows the program to start on startup
+4. Double click executable if you are wanting to run it now
+
 ## Future wants
 I want it to detect mouse movement as well
