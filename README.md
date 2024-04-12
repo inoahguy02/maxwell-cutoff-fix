@@ -18,7 +18,8 @@ So as soon as it detects a form of input (mouse click or keyboard press), it wil
 1. Go to releases and download the most recent patch
 2. Press Win+R and type "shell:startup"
 3. Place exectuable in that directory. This allows the program to start on startup
-4. Double click executable if you are wanting to run it now
+4. Go to windows defender or any other antivirus and whitelist the program. This is necessary because antivirus software will treat this program as a key logger
+5. Double click executable if you are wanting to run it now
 
 ## Future wants
 I want it to detect mouse movement as well
