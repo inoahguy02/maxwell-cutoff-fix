@@ -7,4 +7,3 @@ edition = "2021"
 
 [dependencies]
 soloud = "1.0.5"
-inputbot = "0.6.0"
