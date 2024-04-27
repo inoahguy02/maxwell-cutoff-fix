@@ -1,6 +1,9 @@
-# maxwell-cutoff-fix
+# What's this for?
 
-This is a fix for the Audeze Maxwell's inital audio cutoff
+This is a fix for the Audeze Maxwell's inital audio cutoff<br>
+Currently, the common fix for this problem is to play a silent .mp3 file<br>
+That does fix the problem, but it makes it to where the headset never shuts off<br>
+This program however makes it to where the audio cutoff is gone and allows the headset to shut off after being inactive for some time
 
 ## How to install
 1. Go to releases and download the most recent patch
