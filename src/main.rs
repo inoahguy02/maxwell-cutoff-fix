@@ -8,8 +8,5 @@ use soloud::Soloud;
 
 fn main() {
     let player = Soloud::default().unwrap();
-
-    loop {
-        thread::sleep(Duration::from_secs(86400)); // 24 hours
-    }
+    loop { thread::sleep(Duration::from_secs(86400)) } // 24 hours
 }
