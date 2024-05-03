@@ -1,4 +1,10 @@
-# What's this for?
+# IMPORTANT: PROJECT IS OBSOLETE
+
+Audeze finally decided after a few years to patch this "feature"<br>
+This program is now useless<br>
+Keeping the repo up just so I can see the commit history for key logger stuff
+
+## What's this for?
 
 This is a fix for the Audeze Maxwell's inital audio cutoff<br>
 Currently, the common fix for this problem is to play a silent .mp3 file<br>
