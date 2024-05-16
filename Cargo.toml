@@ -6,4 +6,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-soloud = "1.0.5"
+cpal = "0.15.3"
+rodio = "0.18.0"
+config = "0.14.0"
+anyhow = "1.0.83"
+serde = "1.0.202"
+serde_json = "1.0.117"
+
+[build-dependencies]
+static_vcruntime = "2.0"
