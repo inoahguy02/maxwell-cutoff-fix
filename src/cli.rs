@@ -47,8 +47,8 @@ fn print_devices() {
 
     let host = cpal::default_host();
 
-    for (index, device) in host.devices().unwrap().enumerate() {
-        println!("Device {}: {}", index, device.name().unwrap());
+    for (_, device) in host.devices().unwrap().enumerate() {
+        println!("{}",device.name().unwrap());
     }
     println!();
 }

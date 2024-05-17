@@ -1,4 +1,10 @@
-// #![windows_subsystem = "windows"]
+#![cfg_attr(
+    all(
+      target_os = "windows",
+      not(debug_assertions),
+    ),
+    windows_subsystem = "windows"
+  )]
 #![allow(unused_variables)]
 mod cli;
 mod config;
@@ -26,7 +32,7 @@ fn main() {
             vec![OutputStream::try_default().unwrap()]
         };
         
-        thread::sleep(Duration::from_secs(5));
+        thread::sleep(Duration::from_secs(5)); // Make configurable?
     } 
 }
 
@@ -38,7 +44,7 @@ fn stream_with_cfg(cfg: &DeviceConfig) -> Vec<(OutputStream, OutputStreamHandle)
         let system_devices = host.devices().unwrap();
         for device in system_devices {
             if device.name().unwrap_or_default() == *device_name {
-                println!("Registering device {:?}", device.name().unwrap_or_default());
+                println!("Registering device {}", device.name().unwrap_or_default());
                 let stream = OutputStream::try_from_device(&device).unwrap();
                 streams.push(stream);
             }
