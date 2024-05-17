@@ -1,10 +1,3 @@
-#![cfg_attr(
-    all(
-      target_os = "windows",
-      not(debug_assertions),
-    ),
-    windows_subsystem = "windows"
-  )]
 #![allow(unused_variables)]
 mod cli;
 mod config;
@@ -17,6 +10,8 @@ use rodio::{DeviceTrait, OutputStream, OutputStreamHandle};
 fn main() {
     if cli::cli_used() { return; } // Don't run
     
+    hide_console_window();
+
     let config = match config::load() { // Could make config updates in real time if it is in the loop
         Ok(cfg) => Some(cfg),
         Err(e) => {
@@ -53,4 +48,17 @@ fn stream_with_cfg(cfg: &DeviceConfig) -> Vec<(OutputStream, OutputStreamHandle)
     }
 
     streams
+}
+
+fn hide_console_window() {
+    use std::ptr;
+    use winapi::um::wincon::GetConsoleWindow;
+    use winapi::um::winuser::{ShowWindow, SW_HIDE};
+
+    let window = unsafe {GetConsoleWindow()};
+    if window != ptr::null_mut() {
+        unsafe {
+            ShowWindow(window, SW_HIDE);
+        }
+    }
 }
