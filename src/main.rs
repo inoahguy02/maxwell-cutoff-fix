@@ -21,6 +21,7 @@ fn main() {
         Ok(cfg) => Some(cfg),
         Err(e) => {
             println!("Error: {}", e);
+            println!("Using default device instead");
             None
         }
     };
