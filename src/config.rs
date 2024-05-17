@@ -5,14 +5,13 @@ use serde::{Deserialize, Serialize};
 
 pub fn load() -> Result<DeviceConfig, ConfigError> {
     let settings = Config::builder()
-        .add_source(config::File::new("config.json", FileFormat::Json))
+        .add_source(config::File::new("config.json", FileFormat::Json)) // Looks for file in env::current_dir()
         .build()?;
-
     settings.try_deserialize()
 }
 
 pub fn save(config: &DeviceConfig) -> anyhow::Result<()> {
-    let file = File::create("config.json")?;
+    let file = File::create("config.json")?; // Places file beside exe, not in env::current_dir()
     serde_json::to_writer_pretty(file, config)?;
     Ok(())
 }
