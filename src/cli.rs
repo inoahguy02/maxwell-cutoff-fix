@@ -16,7 +16,7 @@ pub fn cli_used() -> bool {
                 -s | --showall => Display all audio devices found on the system\n\
                 -c | --create => Create config file in the same directory as the program\n\
                 -a | --add <device_name> => Adds device to config file. Surround device in quotes \"\"\n\
-                -d | --delete <device_name> => Removes device from config file. Surreound device in quotes \"\"\n\
+                -d | --delete <device_name> => Removes device from config file. Surround device in quotes \"\"\n\
             ");
         }
         "-s" | "--showall" => print_devices(), // TODO: Print stuff in config
@@ -38,7 +38,6 @@ pub fn cli_used() -> bool {
         _ => println!("Argument not recognized. Use --help for more info")
     }
     
-    // ^ user enters 0, program says "Are you sure you want 0: AUDIO DEVICE NAME HERE to be added?(yes/no)"
     true
 }
 
