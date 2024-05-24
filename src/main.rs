@@ -8,9 +8,13 @@ use cpal::traits::HostTrait;
 use rodio::{DeviceTrait, OutputStream, OutputStreamHandle};
 
 fn main() {
-    if cli::cli_used() { return; } // Don't run
+    if cli::cli_used() { 
+        return; // Don't run
+    } 
     
-    hide_console_window();
+    if cfg!(target_os = "Windows") {
+        hide_console_window();
+    }
 
     let config = match config::load() { // Could make config updates in real time if it is in the loop
         Ok(cfg) => Some(cfg),
