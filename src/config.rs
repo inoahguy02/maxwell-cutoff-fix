@@ -1,6 +1,6 @@
-use std::fs::File;
 use config::{Config, ConfigError, FileFormat};
 use serde::{Deserialize, Serialize};
+use std::fs::File;
 
 pub fn load() -> Result<DeviceConfig, ConfigError> {
     let settings = Config::builder()
@@ -23,5 +23,5 @@ pub fn create_default() -> anyhow::Result<()> {
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct DeviceConfig {
-    pub devices: Vec<String>
+    pub devices: Vec<String>,
 }

@@ -35,9 +35,9 @@ pub fn cli_used() -> bool {
                 println!("Device name not entered correctly");
             }
         }
-        _ => println!("Argument not recognized. Use --help for more info")
+        _ => println!("Argument not recognized. Use --help for more info"),
     }
-    
+
     true
 }
 
@@ -47,11 +47,10 @@ fn print_devices() {
     let host = rodio::cpal::default_host();
 
     for (_, device) in host.devices().unwrap().enumerate() {
-        println!("{}",device.name().unwrap());
+        println!("{}", device.name().unwrap());
     }
     println!();
 }
-
 
 fn add_to_config(device: String) {
     // if config not extist, create_config();
@@ -63,7 +62,7 @@ fn add_to_config(device: String) {
         }
     };
     cfg.devices.push(device);
-    
+
     config::save(&cfg).unwrap();
 }
 
