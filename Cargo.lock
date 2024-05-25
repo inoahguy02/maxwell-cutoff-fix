@@ -549,7 +549,6 @@ version = "1.1.1"
 dependencies = [
  "anyhow",
  "config",
- "cpal",
  "rodio",
  "serde",
  "serde_json",

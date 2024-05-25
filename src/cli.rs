@@ -42,9 +42,9 @@ pub fn cli_used() -> bool {
 }
 
 fn print_devices() {
-    use cpal::traits::{DeviceTrait, HostTrait};
+    use rodio::cpal::traits::{DeviceTrait, HostTrait};
 
-    let host = cpal::default_host();
+    let host = rodio::cpal::default_host();
 
     for (_, device) in host.devices().unwrap().enumerate() {
         println!("{}",device.name().unwrap());

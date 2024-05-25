@@ -4,7 +4,7 @@ mod config;
 
 use std::{thread, time::Duration};
 use config::DeviceConfig;
-use cpal::traits::HostTrait;
+use rodio::cpal::traits::HostTrait;
 use rodio::{DeviceTrait, OutputStream, OutputStreamHandle};
 
 fn main() {
@@ -37,7 +37,7 @@ fn main() {
 }
 
 fn stream_with_cfg(cfg: &DeviceConfig) -> Vec<(OutputStream, OutputStreamHandle)> {
-    let host = cpal::default_host();
+    let host = rodio::cpal::default_host();
     let mut streams = Vec::new();
     
     for device_name in &cfg.devices {
@@ -45,7 +45,10 @@ fn stream_with_cfg(cfg: &DeviceConfig) -> Vec<(OutputStream, OutputStreamHandle)
         for device in system_devices {
             if device.name().unwrap_or_default() == *device_name {
                 println!("Registering device {}", device.name().unwrap_or_default());
-                let stream = OutputStream::try_from_device(&device).unwrap();
+                let stream = OutputStream::try_from_device(&device).unwrap_or_else(|e| {
+                    println!("Error occurred: {}", e);
+                    panic!("Panicked from previous error");
+                });
                 streams.push(stream);
             }
         }
