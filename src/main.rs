@@ -6,7 +6,7 @@
 mod cli;
 mod config;
 
-use config::DeviceConfig;
+use config::MainConfig;
 use rodio::cpal;
 use rodio::cpal::traits::HostTrait;
 use rodio::{DeviceTrait, OutputStream, OutputStreamHandle};
@@ -19,7 +19,11 @@ fn main() {
 
     let config = match config::load() {
         // Could make config updates in real time if it is in the loop
-        Ok(cfg) => Some(cfg),
+        Ok(cfg) => {
+            // Add missing fields to the config
+            config::save(&cfg).unwrap(); // TODO
+            Some(cfg)
+        }
         Err(e) => {
             println!("Error: {}", e);
             println!("Using default device instead");
@@ -39,7 +43,7 @@ fn main() {
 }
 
 fn stream_with_cfg(
-    cfg: &DeviceConfig,
+    cfg: &MainConfig,
 ) -> (Vec<cpal::Stream>, Vec<(OutputStream, OutputStreamHandle)>) {
     // This return type is garbo lol
     let host = cpal::default_host();
