@@ -1,3 +1,8 @@
+#![cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
+
 mod cli;
 mod config;
 
@@ -10,10 +15,6 @@ use std::{thread, time::Duration};
 fn main() {
     if cli::cli_used() {
         return; // Don't run
-    }
-
-    if cfg!(target_os = "Windows") {
-        hide_console_window();
     }
 
     let config = match config::load() {
@@ -72,17 +73,4 @@ fn stream_with_cfg(
     }
 
     (input_streams, output_streams)
-}
-
-fn hide_console_window() {
-    use std::ptr;
-    use winapi::um::wincon::GetConsoleWindow;
-    use winapi::um::winuser::{ShowWindow, SW_HIDE};
-
-    let window = unsafe { GetConsoleWindow() };
-    if window != ptr::null_mut() {
-        unsafe {
-            ShowWindow(window, SW_HIDE);
-        }
-    }
 }
