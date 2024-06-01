@@ -11,7 +11,7 @@ config = "0.14.0"
 anyhow = "1.0.83"
 serde = "1.0.202"
 serde_json = "1.0.117"
-winapi = {version = "0.3", features = ["wincon", "winuser"]}
+fs2 = "0.4.3"
 
 [build-dependencies]
 static_vcruntime = "2.0"

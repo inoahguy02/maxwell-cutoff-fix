@@ -7,9 +7,12 @@ mod cli;
 mod config;
 
 use config::MainConfig;
+use fs2::FileExt;
 use rodio::cpal;
 use rodio::cpal::traits::HostTrait;
 use rodio::{DeviceTrait, OutputStream, OutputStreamHandle};
+use std::fs::File;
+use std::{env, fs};
 use std::{thread, time::Duration};
 
 fn main() {
@@ -17,28 +20,37 @@ fn main() {
         return; // Don't run
     }
 
-    let config = match config::load() {
-        // Could make config updates in real time if it is in the loop
-        Ok(cfg) => {
-            // Add missing fields to the config
-            config::save(&cfg).unwrap(); // TODO
-            Some(cfg)
-        }
-        Err(e) => {
-            println!("Error: {}", e);
-            println!("Using default device instead");
-            None
-        }
-    };
+    // Init logger here
 
-    loop {
-        let _streams = if let Some(ref config) = config {
-            stream_with_cfg(&config)
-        } else {
-            (vec![], vec![OutputStream::try_default().unwrap()])
-        };
+    let lock = get_lock_file().unwrap(); // TODO log
 
-        thread::sleep(Duration::from_secs(5)); // Make configurable?
+    match lock.try_lock_exclusive() {
+        Ok(()) => {
+            let config = match config::load() {
+                // Could make config updates in real time if it is in the loop
+                Ok(cfg) => {
+                    // Add missing fields to the config
+                    config::save(&cfg).unwrap(); // TODO
+                    Some(cfg)
+                }
+                Err(e) => {
+                    println!("Error: {}", e);
+                    println!("Using default device instead");
+                    None
+                }
+            };
+
+            loop {
+                let _streams = if let Some(ref cfg) = config {
+                    stream_with_cfg(&cfg)
+                } else {
+                    (vec![], vec![OutputStream::try_default().unwrap()])
+                };
+
+                thread::sleep(Duration::from_secs(5)); // Make configurable?
+            }
+        }
+        Err(_) => {} // TODO log
     }
 }
 
@@ -77,4 +89,16 @@ fn stream_with_cfg(
     }
 
     (input_streams, output_streams)
+}
+
+fn get_lock_file() -> anyhow::Result<File> {
+    let dir = env::current_dir()?.join("maxwell-cutoff-fix");
+
+    if !dir.exists() {
+        fs::create_dir(&dir)?;
+    }
+
+    let lock_path = &dir.join("maxwell-cutoff-fix.lock");
+
+    Ok(fs::File::create(lock_path)?)
 }
