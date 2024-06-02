@@ -32,7 +32,7 @@ fn main() {
     #[cfg(debug_assertions)]
     Logger::try_with_str("debug").unwrap().start().unwrap();
 
-    let lock = mcf.get_lock_file().unwrap(); // TODO debug log
+    let lock = mcf.get_lock_file().unwrap(); // We want to crash here
 
     match lock.try_lock_exclusive() {
         Ok(()) => {
@@ -45,7 +45,9 @@ fn main() {
                     info!("Config found. Initialized logger");
 
                     // Add missing fields to the config
-                    mcf.save(&cfg).unwrap(); // TODO
+                    if let Err(e) = mcf.save(&cfg) {
+                        warn!("Failed to add missing fields to config: {}", e);
+                    }
 
                     Some(cfg)
                 }
@@ -64,13 +66,19 @@ fn main() {
                 let _streams = if let Some(ref cfg) = config {
                     stream_with_cfg(&cfg)
                 } else {
-                    (vec![], vec![OutputStream::try_default().unwrap()])
+                    (
+                        vec![],
+                        vec![OutputStream::try_default().unwrap_or_else(|e| {
+                            error!("Failed to initialize default device: {}", e);
+                            panic!()
+                        })],
+                    )
                 };
 
                 thread::sleep(Duration::from_secs(5)); // Make configurable?
             }
         }
-        Err(_) => {} // TODO log
+        Err(e) => error!("Failed to lock file: {}", e),
     }
 }
 
@@ -83,7 +91,10 @@ fn stream_with_cfg(
     let mut input_streams = Vec::new();
 
     for device_name in &cfg.devices {
-        let system_devices = host.devices().unwrap();
+        let system_devices = host.devices().unwrap_or_else(|e| {
+            error!("Failed to initialize devices: {}", e);
+            panic!()
+        });
         for device in system_devices {
             if device.name().unwrap_or_default() == *device_name {
                 debug!("Registering device {}", device.name().unwrap_or_default());
@@ -91,7 +102,10 @@ fn stream_with_cfg(
                     output_streams.push(stream);
                 } else {
                     // Going to assume that this is an input device
-                    let default_config = device.default_input_config().unwrap(); // TODO
+                    let default_config = device.default_input_config().unwrap_or_else(|e| {
+                        error!("Failed to get default input config: {}", e);
+                        panic!()
+                    });
                     let stream = device
                         .build_input_stream(
                             &default_config.config(),
@@ -101,7 +115,10 @@ fn stream_with_cfg(
                             },
                             None,
                         )
-                        .unwrap(); // TODO
+                        .unwrap_or_else(|e| {
+                            error!("Failed to build input stream: {}", e);
+                            panic!()
+                        });
                     input_streams.push(stream);
                 }
             }
