@@ -30,7 +30,7 @@ pub struct MainConfig {
     pub devices: Vec<String>,
 
     #[serde(default = "default_num_of_kept_logs")]
-    num_of_kept_logs: u16,
+    pub num_of_kept_logs: u16,
 }
 
 impl Default for MainConfig {

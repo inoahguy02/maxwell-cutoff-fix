@@ -10,7 +10,9 @@ mod cli;
 mod config;
 
 use config::MainConfig;
+use flexi_logger::Logger;
 use fs2::FileExt;
+use log::{debug, error, info, warn};
 use rodio::cpal;
 use rodio::cpal::traits::HostTrait;
 use rodio::{DeviceTrait, OutputStream, OutputStreamHandle};
@@ -26,22 +28,34 @@ fn main() {
         return; // Don't run
     }
 
-    // Init logger here
+    // Debug logger
+    #[cfg(debug_assertions)]
+    Logger::try_with_str("debug").unwrap().start().unwrap();
 
-    let lock = mcf.get_lock_file().unwrap(); // TODO log
+    let lock = mcf.get_lock_file().unwrap(); // TODO debug log
 
     match lock.try_lock_exclusive() {
         Ok(()) => {
             let config = match mcf.load() {
                 // Could make config updates in real time if it is in the loop
                 Ok(cfg) => {
+                    #[cfg(not(debug_assertions))]
+                    mcf.initialize_logger(cfg.num_of_kept_logs.into());
+
+                    info!("Config found. Initialized logger");
+
                     // Add missing fields to the config
                     mcf.save(&cfg).unwrap(); // TODO
+
                     Some(cfg)
                 }
                 Err(e) => {
-                    println!("Error: {}", e);
-                    println!("Using default device instead");
+                    #[cfg(not(debug_assertions))]
+                    mcf.initialize_logger(10);
+
+                    error!("Error: {}", e);
+                    warn!("Config not found. Defaulting 'num_of_kept_logs' to 10");
+                    info!("Using default device");
                     None
                 }
             };
@@ -72,7 +86,7 @@ fn stream_with_cfg(
         let system_devices = host.devices().unwrap();
         for device in system_devices {
             if device.name().unwrap_or_default() == *device_name {
-                println!("Registering device {}", device.name().unwrap_or_default());
+                debug!("Registering device {}", device.name().unwrap_or_default());
                 if let Ok(stream) = OutputStream::try_from_device(&device) {
                     output_streams.push(stream);
                 } else {
@@ -83,7 +97,7 @@ fn stream_with_cfg(
                             &default_config.config(),
                             move |_data: &[f32], _: &cpal::InputCallbackInfo| {},
                             move |e| {
-                                println!("Error occured on input stream: {}", e);
+                                error!("Error occured on input stream: {}", e);
                             },
                             None,
                         )
@@ -118,5 +132,20 @@ impl MCF {
         let lock_path = self.extra_files_dir.join("maxwell-cutoff-fix.lock");
 
         Ok(fs::File::create(lock_path)?)
+    }
+
+    #[cfg(not(debug_assertions))]
+    fn initialize_logger(&self, num_of_kept_files: usize) {
+        Logger::try_with_str("info")
+            .unwrap()
+            .log_to_file(flexi_logger::FileSpec::default().directory(&self.extra_files_dir))
+            .rotate(
+                flexi_logger::Criterion::Size(10 * 1024 * 1024), // 10 MB
+                flexi_logger::Naming::Timestamps,
+                flexi_logger::Cleanup::KeepLogFiles(num_of_kept_files),
+            )
+            .format_for_files(flexi_logger::detailed_format)
+            .start()
+            .unwrap();
     }
 }
