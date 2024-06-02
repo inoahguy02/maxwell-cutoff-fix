@@ -3,6 +3,9 @@
     windows_subsystem = "windows"
 )]
 
+///////////////////////////////////////////////////////////
+/// `cargo run` WILL NOT WORK IF YOU WANT TO USE CONFIG ///
+///////////////////////////////////////////////////////////
 mod cli;
 mod config;
 
@@ -12,25 +15,28 @@ use rodio::cpal;
 use rodio::cpal::traits::HostTrait;
 use rodio::{DeviceTrait, OutputStream, OutputStreamHandle};
 use std::fs::File;
+use std::path::PathBuf;
 use std::{env, fs};
 use std::{thread, time::Duration};
 
 fn main() {
-    if cli::cli_used() {
+    let mcf = MCF::init();
+
+    if mcf.cli_used() {
         return; // Don't run
     }
 
     // Init logger here
 
-    let lock = get_lock_file().unwrap(); // TODO log
+    let lock = mcf.get_lock_file().unwrap(); // TODO log
 
     match lock.try_lock_exclusive() {
         Ok(()) => {
-            let config = match config::load() {
+            let config = match mcf.load() {
                 // Could make config updates in real time if it is in the loop
                 Ok(cfg) => {
                     // Add missing fields to the config
-                    config::save(&cfg).unwrap(); // TODO
+                    mcf.save(&cfg).unwrap(); // TODO
                     Some(cfg)
                 }
                 Err(e) => {
@@ -91,14 +97,26 @@ fn stream_with_cfg(
     (input_streams, output_streams)
 }
 
-fn get_lock_file() -> anyhow::Result<File> {
-    let dir = env::current_dir()?.join("maxwell-cutoff-fix");
+pub struct MCF {
+    pub extra_files_dir: PathBuf,
+}
 
-    if !dir.exists() {
-        fs::create_dir(&dir)?;
+impl MCF {
+    fn init() -> Self {
+        let dir = env::current_dir().unwrap().join("maxwell-cutoff-fix");
+
+        if !dir.exists() {
+            fs::create_dir(&dir).unwrap();
+        }
+
+        Self {
+            extra_files_dir: dir,
+        }
     }
 
-    let lock_path = &dir.join("maxwell-cutoff-fix.lock");
+    fn get_lock_file(&self) -> anyhow::Result<File> {
+        let lock_path = self.extra_files_dir.join("maxwell-cutoff-fix.lock");
 
-    Ok(fs::File::create(lock_path)?)
+        Ok(fs::File::create(lock_path)?)
+    }
 }

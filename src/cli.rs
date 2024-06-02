@@ -1,44 +1,68 @@
-use crate::config;
+use crate::{config::MainConfig, MCF};
 
-pub fn cli_used() -> bool {
-    let args: Vec<String> = std::env::args().collect();
+impl MCF {
+    pub fn cli_used(&self) -> bool {
+        let args: Vec<String> = std::env::args().collect();
 
-    if args.len() < 2 {
-        return false;
+        if args.len() < 2 {
+            return false;
+        }
+
+        let arg = args[1].as_str();
+
+        match arg {
+            "/?" | "-h" | "--help" => {
+                println!("\
+                    /? | -h | --help => Shows this menu\n\
+                    -s | --showall => Display all audio devices found on the system\n\
+                    -c | --create => Create config file in the same directory as the program\n\
+                    -a | --add <device_name> => Adds device to config file. Surround device in quotes \"\"\n\
+                    -d | --delete <device_name> => Removes device from config file. Surround device in quotes \"\"\n\
+                ");
+            }
+            "-s" | "--showall" => print_devices(), // TODO: Print stuff in config
+            "-c" | "--create" => self.save(&MainConfig::default()).unwrap(),
+            "-a" | "--add" => {
+                if let Some(name) = args.get(2) {
+                    self.add_to_config(name.clone());
+                } else {
+                    println!("Device name not entered correctly");
+                }
+            }
+            "-d" | "--delete" => {
+                if let Some(name) = args.get(2) {
+                    self.remove_from_config(name.clone());
+                } else {
+                    println!("Device name not entered correctly");
+                }
+            }
+            _ => println!("Argument not recognized. Use --help for more info"),
+        }
+
+        true
     }
 
-    let arg = args[1].as_str();
+    fn add_to_config(&self, device: String) {
+        // if config not extist, create_config();
+        let mut cfg = match self.load() {
+            Ok(cfg) => cfg,
+            Err(_) => {
+                self.save(&MainConfig::default()).unwrap();
+                self.load().unwrap() // panic if this errors out
+            }
+        };
+        cfg.devices.push(device);
 
-    match arg {
-        "/?" | "-h" | "--help" => {
-            println!("\
-                /? | -h | --help => Shows this menu\n\
-                -s | --showall => Display all audio devices found on the system\n\
-                -c | --create => Create config file in the same directory as the program\n\
-                -a | --add <device_name> => Adds device to config file. Surround device in quotes \"\"\n\
-                -d | --delete <device_name> => Removes device from config file. Surround device in quotes \"\"\n\
-            ");
-        }
-        "-s" | "--showall" => print_devices(), // TODO: Print stuff in config
-        "-c" | "--create" => config::create_default().unwrap(),
-        "-a" | "--add" => {
-            if let Some(name) = args.get(2) {
-                add_to_config(name.clone());
-            } else {
-                println!("Device name not entered correctly");
-            }
-        }
-        "-d" | "--delete" => {
-            if let Some(name) = args.get(2) {
-                remove_from_config(name.clone());
-            } else {
-                println!("Device name not entered correctly");
-            }
-        }
-        _ => println!("Argument not recognized. Use --help for more info"),
+        self.save(&cfg).unwrap();
     }
 
-    true
+    fn remove_from_config(&self, device: String) {
+        // if config not exist, return
+        let mut cfg = self.load().unwrap();
+        cfg.devices.retain(|d| d != device.as_str());
+
+        self.save(&cfg).unwrap();
+    }
 }
 
 fn print_devices() {
@@ -50,26 +74,4 @@ fn print_devices() {
         println!("{}", device.name().unwrap());
     }
     println!();
-}
-
-fn add_to_config(device: String) {
-    // if config not extist, create_config();
-    let mut cfg = match config::load() {
-        Ok(cfg) => cfg,
-        Err(_) => {
-            config::create_default().unwrap();
-            config::load().unwrap() // panic if this errors out
-        }
-    };
-    cfg.devices.push(device);
-
-    config::save(&cfg).unwrap();
-}
-
-fn remove_from_config(device: String) {
-    // if config not exist, return
-    let mut cfg = config::load().unwrap();
-    cfg.devices.retain(|d| d != device.as_str());
-
-    config::save(&cfg).unwrap();
 }

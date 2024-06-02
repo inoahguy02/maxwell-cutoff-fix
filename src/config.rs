@@ -1,24 +1,28 @@
-use config::{Config, ConfigError, FileFormat};
+use config::{Config, FileFormat};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 
-pub fn load() -> Result<MainConfig, ConfigError> {
-    let settings = Config::builder()
-        .add_source(config::File::new("config.json", FileFormat::Json)) // Looks for file in env::current_dir()
-        .build()?;
-    settings.try_deserialize()
-}
+use crate::MCF;
 
-pub fn save(config: &MainConfig) -> anyhow::Result<()> {
-    let file = File::create("config.json")?; // Places file beside exe, not in env::current_dir()
-    serde_json::to_writer_pretty(file, config)?;
-    Ok(())
-}
+impl MCF {
+    pub fn load(&self) -> anyhow::Result<MainConfig> {
+        let path = self.extra_files_dir.join("config.json");
+        let path_str = path
+            .to_str()
+            .ok_or_else(|| anyhow::anyhow!("Failed to convert path to &str"))?;
 
-pub fn create_default() -> anyhow::Result<()> {
-    let file = File::create("config.json")?;
-    serde_json::to_writer_pretty(file, &MainConfig::default())?;
-    Ok(())
+        let settings = Config::builder()
+            .add_source(config::File::new(path_str, FileFormat::Json))
+            .build()?;
+
+        Ok(settings.try_deserialize()?)
+    }
+
+    pub fn save(&self, config: &MainConfig) -> anyhow::Result<()> {
+        let file = File::create(self.extra_files_dir.join("config.json"))?;
+        serde_json::to_writer_pretty(file, config)?;
+        Ok(())
+    }
 }
 
 #[derive(Serialize, Deserialize)]
