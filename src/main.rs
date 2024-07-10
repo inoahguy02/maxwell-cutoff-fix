@@ -11,15 +11,14 @@ mod config;
 
 use config::MainConfig;
 use flexi_logger::Logger;
-use fs2::FileExt;
 use log::{debug, error, info, warn};
 use rodio::cpal;
 use rodio::cpal::traits::HostTrait;
 use rodio::{DeviceTrait, OutputStream, OutputStreamHandle};
-use std::fs::File;
 use std::path::PathBuf;
 use std::{env, fs};
 use std::{thread, time::Duration};
+use sysinfo::System;
 
 fn main() {
     let mcf = MCF::init();
@@ -28,57 +27,54 @@ fn main() {
         return; // Don't run
     }
 
+    if mcf.already_running() {
+        return; // Don't run
+    }
+
     // Debug logger
     #[cfg(debug_assertions)]
     Logger::try_with_str("debug").unwrap().start().unwrap();
 
-    let lock = mcf.get_lock_file().unwrap(); // We want to crash here
+    let config = match mcf.load() {
+        // Could make config updates in real time if it is in the loop
+        Ok(cfg) => {
+            #[cfg(not(debug_assertions))]
+            mcf.initialize_logger(cfg.num_of_kept_logs.into());
 
-    match lock.try_lock_exclusive() {
-        Ok(()) => {
-            let config = match mcf.load() {
-                // Could make config updates in real time if it is in the loop
-                Ok(cfg) => {
-                    #[cfg(not(debug_assertions))]
-                    mcf.initialize_logger(cfg.num_of_kept_logs.into());
+            info!("Config found. Initialized logger");
 
-                    info!("Config found. Initialized logger");
-
-                    // Add missing fields to the config
-                    if let Err(e) = mcf.save(&cfg) {
-                        warn!("Failed to add missing fields to config: {}", e);
-                    }
-
-                    Some(cfg)
-                }
-                Err(e) => {
-                    #[cfg(not(debug_assertions))]
-                    mcf.initialize_logger(10);
-
-                    error!("Error: {}", e);
-                    warn!("Config not found. Defaulting 'num_of_kept_logs' to 10");
-                    info!("Using default device");
-                    None
-                }
-            };
-
-            loop {
-                let _streams = if let Some(ref cfg) = config {
-                    stream_with_cfg(&cfg)
-                } else {
-                    (
-                        vec![],
-                        vec![OutputStream::try_default().unwrap_or_else(|e| {
-                            error!("Failed to initialize default device: {}", e);
-                            panic!()
-                        })],
-                    )
-                };
-
-                thread::sleep(Duration::from_secs(5)); // Make configurable?
+            // Add missing fields to the config
+            if let Err(e) = mcf.save(&cfg) {
+                warn!("Failed to add missing fields to config: {}", e);
             }
+
+            Some(cfg)
         }
-        Err(e) => error!("Failed to lock file: {}", e),
+        Err(e) => {
+            #[cfg(not(debug_assertions))]
+            mcf.initialize_logger(10);
+
+            error!("Error: {}", e);
+            warn!("Config not found. Defaulting 'num_of_kept_logs' to 10");
+            info!("Using default device");
+            None
+        }
+    };
+
+    loop {
+        let _streams = if let Some(ref cfg) = config {
+            stream_with_cfg(&cfg)
+        } else {
+            (
+                vec![],
+                vec![OutputStream::try_default().unwrap_or_else(|e| {
+                    error!("Failed to initialize default device: {}", e);
+                    panic!()
+                })],
+            )
+        };
+
+        thread::sleep(Duration::from_secs(5)); // Make configurable?
     }
 }
 
@@ -134,7 +130,7 @@ pub struct MCF {
 
 impl MCF {
     fn init() -> Self {
-        let dir = env::current_dir().unwrap().join("maxwell-cutoff-fix");
+        let dir = env::current_dir().unwrap().join("maxwell-fix");
 
         if !dir.exists() {
             fs::create_dir(&dir).unwrap();
@@ -145,10 +141,21 @@ impl MCF {
         }
     }
 
-    fn get_lock_file(&self) -> anyhow::Result<File> {
-        let lock_path = self.extra_files_dir.join("maxwell-cutoff-fix.lock");
+    fn already_running(&self) -> bool {
+        // We can unwrap here because we can't log, and can't do anything if this fails
+        let current_exe = env::current_exe().unwrap();
+        let current_exe_name_osstr = current_exe.file_name().unwrap();
+        let current_exe_name = current_exe_name_osstr.to_str().unwrap();
 
-        Ok(fs::File::create(lock_path)?)
+        let system = System::new_all();
+
+        let process_list = system.processes_by_name(current_exe_name);
+
+        if process_list.count() > 1 {
+            return true;
+        }
+
+        false
     }
 
     #[cfg(not(debug_assertions))]
