@@ -16,10 +16,10 @@ use log::{debug, error, info, warn};
 use rodio::cpal;
 use rodio::cpal::traits::HostTrait;
 use rodio::{DeviceTrait, OutputStream, OutputStreamHandle};
+use single_instance::SingleInstance;
 use std::path::PathBuf;
 use std::{env, fs};
 use std::{thread, time::Duration};
-use sysinfo::System;
 
 fn main() {
     let mcf = MCF::init();
@@ -28,8 +28,9 @@ fn main() {
         return; // Don't run
     }
 
-    if mcf.already_running() {
-        return; // Don't run
+    let lock = SingleInstance::new("maxwell-fix").unwrap();
+    if !lock.is_single() {
+        return;
     }
 
     // Make sure app will run on startup
@@ -143,23 +144,6 @@ impl MCF {
         Self {
             extra_files_dir: dir,
         }
-    }
-
-    fn already_running(&self) -> bool {
-        // We can unwrap here because we can't log, and can't do anything if this fails
-        let current_exe = env::current_exe().unwrap();
-        let current_exe_name_osstr = current_exe.file_name().unwrap();
-        let current_exe_name = current_exe_name_osstr.to_str().unwrap();
-
-        let system = System::new_all();
-
-        let process_list = system.processes_by_name(current_exe_name);
-
-        if process_list.count() > 1 {
-            return true;
-        }
-
-        false
     }
 
     #[cfg(not(debug_assertions))]
