@@ -9,6 +9,7 @@
 mod cli;
 mod config;
 
+use auto_launch::AutoLaunch;
 use config::MainConfig;
 use flexi_logger::Logger;
 use log::{debug, error, info, warn};
@@ -30,6 +31,9 @@ fn main() {
     if mcf.already_running() {
         return; // Don't run
     }
+
+    // Make sure app will run on startup
+    enable_autorun();
 
     // Debug logger
     #[cfg(debug_assertions)]
@@ -172,4 +176,17 @@ impl MCF {
             .start()
             .unwrap();
     }
+}
+
+fn enable_autorun() {
+    // I think this works for both windows and linux
+
+    let app_name = "maxwell-fix"; // This will need to be changed if name changed
+
+    let path = env::current_exe().unwrap();
+    let app_path = path.as_os_str().to_str().unwrap();
+    // path/to/app.exe
+
+    let stuff = AutoLaunch::new(app_name, app_path, &[] as &[&str]);
+    _ = stuff.enable().is_ok();
 }
