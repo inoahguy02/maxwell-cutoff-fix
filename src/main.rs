@@ -28,6 +28,7 @@ fn main() {
         return; // Don't run
     }
 
+    // Try to create the global mutex
     let lock = SingleInstance::new("maxwell-fix").unwrap();
     if !lock.is_single() {
         return;
