@@ -1,8 +1,3 @@
-#![cfg_attr(
-    all(not(debug_assertions), target_os = "windows"),
-    windows_subsystem = "windows"
-)]
-
 ///////////////////////////////////////////////////////////
 /// `cargo run` WILL NOT WORK IF YOU WANT TO USE CONFIG ///
 ///////////////////////////////////////////////////////////
@@ -17,15 +12,26 @@ use rodio::cpal;
 use rodio::cpal::traits::HostTrait;
 use rodio::{DeviceTrait, OutputStream, OutputStreamHandle};
 use single_instance::SingleInstance;
+use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
+use std::process::Command;
 use std::{env, fs};
 use std::{thread, time::Duration};
+use windows::Win32::System::Console::FreeConsole;
 
 fn main() {
     let mcf = MCF::init();
 
     if mcf.cli_used() {
         return; // Don't run
+    }
+
+    // Make sure app doesn't take console window hostage
+    detach_process();
+
+    // Make console window go away
+    unsafe {
+        FreeConsole().unwrap();
     }
 
     // Try to create the global mutex
@@ -174,4 +180,23 @@ fn enable_autorun() {
 
     let stuff = AutoLaunch::new(app_name, app_path, &[] as &[&str]);
     _ = stuff.enable().is_ok();
+}
+
+fn detach_process() {
+    if let Ok(is_detached) = env::var("DETACHED") {
+        if is_detached == "1" {
+            return;
+        }
+    }
+
+    let current_exe = env::current_exe().unwrap();
+    let mut command = Command::new(current_exe);
+    command.env("DETACHED", "1");
+    command.creation_flags(0x00000008); // Detached process flag
+
+    command.spawn().unwrap();
+
+    println!("Started maxwell-fix");
+
+    std::process::exit(0);
 }
