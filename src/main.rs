@@ -142,7 +142,11 @@ pub struct MCF {
 
 impl MCF {
     fn init() -> Self {
-        let dir = env::current_dir().unwrap().join("maxwell-fix");
+        let dir = env::current_exe()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("maxwell-fix");
 
         if !dir.exists() {
             fs::create_dir(&dir).unwrap();
