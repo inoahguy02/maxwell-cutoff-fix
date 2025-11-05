@@ -1,0 +1,42 @@
+name: Build App
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - "main"
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions/setup-rust@v1
+        with:
+          rust-version: stable
+
+      - name: Build release binary
+        run: cargo build --release
+
+      - name: Package binary
+        shell: bash
+        run: |
+          mkdir artifacts
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            echo "BINARY_PATH=target/release/maxwell-fix.exe" >> $GITHUB_ENV
+          else
+            echo "BINARY_PATH=target/release/maxwell-fix" >> $GITHUB_ENV
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: maxwell-fix-${{ runner.os }}
+          path: ${{ env.BINARY_PATH }}
