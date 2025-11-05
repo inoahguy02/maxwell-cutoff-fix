@@ -12,11 +12,15 @@ use rodio::cpal;
 use rodio::cpal::traits::HostTrait;
 use rodio::{DeviceTrait, OutputStream, OutputStreamHandle};
 use single_instance::SingleInstance;
-use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
 use std::{env, fs};
 use std::{thread, time::Duration};
+
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+#[cfg(target_os = "windows")]
 use windows::Win32::System::Console::FreeConsole;
 
 fn main() {
@@ -29,7 +33,8 @@ fn main() {
     // Make sure app doesn't take console window hostage
     detach_process();
 
-    // Make console window go away
+    // Make console window go away (Windows only)
+    #[cfg(target_os = "windows")]
     unsafe {
         FreeConsole().unwrap();
     }
@@ -196,6 +201,8 @@ fn detach_process() {
     let current_exe = env::current_exe().unwrap();
     let mut command = Command::new(current_exe);
     command.env("DETACHED", "1");
+
+    #[cfg(target_os = "windows")]
     command.creation_flags(0x00000008); // Detached process flag
 
     command.spawn().unwrap();

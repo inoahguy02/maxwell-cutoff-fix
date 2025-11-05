@@ -15,7 +15,9 @@ log = "0.4"
 flexi_logger = "0.29"
 auto-launch = "0.5.0"
 single-instance = "0.3.3"
+
+[target.'cfg(windows)'.dependencies]
 windows = { version = "0.59.0", features = ["Win32_System_Console"] }
 
-[build-dependencies]
+[target.'cfg(windows)'.build-dependencies]
 static_vcruntime = "2.0"
