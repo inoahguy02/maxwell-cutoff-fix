@@ -4,17 +4,16 @@
 mod cli;
 mod config;
 
+use anyhow::{anyhow, Context};
 use auto_launch::AutoLaunch;
-use config::MainConfig;
 use flexi_logger::Logger;
-use log::{debug, error, info, warn};
+use log::error;
 use rodio::cpal;
 use rodio::cpal::traits::HostTrait;
 use rodio::{DeviceTrait, OutputStream, OutputStreamHandle};
 use single_instance::SingleInstance;
-use std::path::PathBuf;
+use std::env;
 use std::process::Command;
-use std::{env, fs};
 use std::{thread, time::Duration};
 
 #[cfg(target_os = "windows")]
@@ -23,191 +22,183 @@ use std::os::windows::process::CommandExt;
 #[cfg(target_os = "windows")]
 use windows::Win32::System::Console::FreeConsole;
 
+use crate::config::ConfigManager;
+
 fn main() {
-    let mcf = MCF::init();
+    if let Err(e) = start() {
+        println!("Error returned from start(): {:#}", e);
+        error!("Error returned from start(): {:#}", e);
+    }
+}
+
+fn start() -> anyhow::Result<()> {
+    // Try to create the global mutex. Need to ensure we are the only one
+    let lock = SingleInstance::new("maxwell-fix")?;
+    if !lock.is_single() {
+        println!("Another instance is currently running\nClosing program in 5 seconds...");
+        thread::sleep(Duration::from_secs(5));
+        return Err(anyhow!("Another instance is currently running"));
+    }
+
+    let mcf = MCF::init()?;
 
     if mcf.cli_used() {
-        return; // Don't run
+        return Ok(()); // Don't run
     }
 
-    // Make sure app doesn't take console window hostage
-    detach_process();
-
-    // Make console window go away (Windows only)
-    #[cfg(target_os = "windows")]
-    unsafe {
-        FreeConsole().unwrap();
-    }
-
-    // Try to create the global mutex
-    let lock = SingleInstance::new("maxwell-fix").unwrap();
-    if !lock.is_single() {
-        return;
-    }
-
-    // Make sure app will run on startup
-    enable_autorun();
-
-    // Debug logger
-    #[cfg(debug_assertions)]
-    Logger::try_with_str("debug").unwrap().start().unwrap();
-
-    let config = match mcf.load() {
-        // Could make config updates in real time if it is in the loop
-        Ok(cfg) => {
-            #[cfg(not(debug_assertions))]
-            mcf.initialize_logger(cfg.num_of_kept_logs.into());
-
-            info!("Config found. Initialized logger");
-
-            // Add missing fields to the config
-            if let Err(e) = mcf.save(&cfg) {
-                warn!("Failed to add missing fields to config: {}", e);
-            }
-
-            Some(cfg)
-        }
-        Err(e) => {
-            #[cfg(not(debug_assertions))]
-            mcf.initialize_logger(10);
-
-            error!("Error: {}", e);
-            warn!("Config not found. Defaulting 'num_of_kept_logs' to 10");
-            info!("Using default device");
-            None
-        }
-    };
-
-    loop {
-        let _streams = if let Some(ref cfg) = config {
-            stream_with_cfg(&cfg)
-        } else {
-            (
-                vec![],
-                vec![OutputStream::try_default().unwrap_or_else(|e| {
-                    error!("Failed to initialize default device: {}", e);
-                    panic!()
-                })],
-            )
-        };
-
-        thread::sleep(Duration::from_secs(5)); // Make configurable?
-    }
-}
-
-fn stream_with_cfg(
-    cfg: &MainConfig,
-) -> (Vec<cpal::Stream>, Vec<(OutputStream, OutputStreamHandle)>) {
-    // This return type is garbo lol
-    let host = cpal::default_host();
-    let mut output_streams = Vec::new();
-    let mut input_streams = Vec::new();
-
-    for device_name in &cfg.devices {
-        let system_devices = host.devices().unwrap_or_else(|e| {
-            error!("Failed to initialize devices: {}", e);
-            panic!()
-        });
-        for device in system_devices {
-            if device.name().unwrap_or_default() == *device_name {
-                debug!("Registering device {}", device.name().unwrap_or_default());
-                if let Ok(stream) = OutputStream::try_from_device(&device) {
-                    output_streams.push(stream);
-                } else {
-                    // Going to assume that this is an input device
-                    let default_config = device.default_input_config().unwrap_or_else(|e| {
-                        error!("Failed to get default input config: {}", e);
-                        panic!()
-                    });
-                    let stream = device
-                        .build_input_stream(
-                            &default_config.config(),
-                            move |_data: &[f32], _: &cpal::InputCallbackInfo| {},
-                            move |e| {
-                                error!("Error occured on input stream: {}", e);
-                            },
-                            None,
-                        )
-                        .unwrap_or_else(|e| {
-                            error!("Failed to build input stream: {}", e);
-                            panic!()
-                        });
-                    input_streams.push(stream);
-                }
-            }
-        }
-    }
-
-    (input_streams, output_streams)
-}
-
-pub struct MCF {
-    pub extra_files_dir: PathBuf,
+    mcf.run()
 }
 
 impl MCF {
-    fn init() -> Self {
-        let dir = env::current_exe()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join("maxwell-fix");
+    fn run(&self) -> anyhow::Result<()> {
+        self.initialize_logger()?;
 
-        if !dir.exists() {
-            fs::create_dir(&dir).unwrap();
+        // Make sure app doesn't take console window hostage
+        self.detach_process()?;
+
+        // Make console window go away (Windows only)
+        #[cfg(target_os = "windows")]
+        unsafe {
+            FreeConsole()?;
         }
 
-        Self {
-            extra_files_dir: dir,
+        // Make sure app will run on startup
+        if self.cfgmgr.cfg.borrow().autostart {
+            self.enable_autorun()?;
+        }
+
+        loop {
+            self.cfgmgr.reload_config()?;
+            let _streams = self.get_streams()?;
+            thread::sleep(Duration::from_secs(5)); // Make configurable?
         }
     }
 
-    #[cfg(not(debug_assertions))]
-    fn initialize_logger(&self, num_of_kept_files: usize) {
-        Logger::try_with_str("info")
-            .unwrap()
-            .log_to_file(flexi_logger::FileSpec::default().directory(&self.extra_files_dir))
+    // I think this works for both windows and linux
+    fn enable_autorun(&self) -> anyhow::Result<()> {
+        let app_name = "maxwell-fix"; // This will need to be changed if name changed
+
+        let path = env::current_exe()?;
+        let app_path = path
+            .as_os_str()
+            .to_str()
+            .context("Failed to get app_path")?;
+        // path/to/app.exe
+
+        AutoLaunch::new(app_name, app_path, &[] as &[&str]).enable()?;
+
+        Ok(())
+    }
+
+    fn detach_process(&self) -> anyhow::Result<()> {
+        if let Ok(is_detached) = env::var("DETACHED") {
+            if is_detached == "1" {
+                return Ok(());
+            }
+        }
+
+        let current_exe = env::current_exe()?;
+        let mut command = Command::new(current_exe);
+        command.env("DETACHED", "1");
+
+        #[cfg(target_os = "windows")]
+        command.creation_flags(0x00000008); // Detached process flag
+
+        command.spawn()?;
+
+        println!("Started maxwell-fix");
+
+        std::process::exit(0);
+    }
+
+    fn init() -> anyhow::Result<Self> {
+        Ok(Self {
+            cfgmgr: ConfigManager::init()?,
+        })
+    }
+
+    fn initialize_logger(&self) -> anyhow::Result<()> {
+        if cfg!(debug_assertions) {
+            Logger::try_with_str("debug")?.start()?;
+            return Ok(());
+        }
+
+        let logdir = self
+            .cfgmgr
+            .cfg_file_path
+            .parent()
+            .context("Failed to get parent dir")?
+            .join("maxwell-fix-logs");
+
+        Logger::try_with_str("info")?
+            .log_to_file(flexi_logger::FileSpec::default().directory(&logdir))
             .rotate(
                 flexi_logger::Criterion::Size(10 * 1024 * 1024), // 10 MB
                 flexi_logger::Naming::Timestamps,
-                flexi_logger::Cleanup::KeepLogFiles(num_of_kept_files),
+                flexi_logger::Cleanup::KeepLogFiles(
+                    self.cfgmgr.cfg.borrow().num_of_kept_logs as usize,
+                ),
             )
             .format_for_files(flexi_logger::detailed_format)
-            .start()
-            .unwrap();
+            .start()?;
+
+        Ok(())
     }
-}
 
-fn enable_autorun() {
-    // I think this works for both windows and linux
+    fn get_streams(&self) -> anyhow::Result<Streams> {
+        let mut streams = Streams::default();
 
-    let app_name = "maxwell-fix"; // This will need to be changed if name changed
-
-    let path = env::current_exe().unwrap();
-    let app_path = path.as_os_str().to_str().unwrap();
-    // path/to/app.exe
-
-    let stuff = AutoLaunch::new(app_name, app_path, &[] as &[&str]);
-    _ = stuff.enable().is_ok();
-}
-
-fn detach_process() {
-    if let Ok(is_detached) = env::var("DETACHED") {
-        if is_detached == "1" {
-            return;
+        if self.cfgmgr.cfg.borrow().devices.len() == 0 {
+            // No device found in config. Attempt default
+            streams
+                .output_streams
+                .push(OutputStream::try_default().context(
+                "No device found in config. Failed to create stream using default output device",
+            )?);
+            return Ok(streams);
         }
+
+        let system_devices = cpal::default_host().devices()?;
+
+        for system_device in system_devices {
+            if self
+                .cfgmgr
+                .cfg
+                .borrow()
+                .devices
+                .contains(&system_device.name()?)
+            {
+                if let Ok(stream) = OutputStream::try_from_device(&system_device) {
+                    // Output device
+                    streams.output_streams.push(stream);
+                    break;
+                }
+
+                // Going to assume that this is an input device
+                let input_cfg = system_device.default_input_config()?;
+                let stream = system_device.build_input_stream(
+                    &input_cfg.config(),
+                    move |_data: &[f32], _: &cpal::InputCallbackInfo| {},
+                    move |e| {
+                        error!("Error occured on input stream: {}", e);
+                    },
+                    None,
+                )?;
+                streams.input_streams.push(stream)
+            }
+        }
+
+        Ok(streams)
     }
+}
 
-    let current_exe = env::current_exe().unwrap();
-    let mut command = Command::new(current_exe);
-    command.env("DETACHED", "1");
+pub struct MCF {
+    // pub extra_files_dir: PathBuf,
+    pub cfgmgr: ConfigManager,
+}
 
-    #[cfg(target_os = "windows")]
-    command.creation_flags(0x00000008); // Detached process flag
-
-    command.spawn().unwrap();
-
-    println!("Started maxwell-fix");
-
-    std::process::exit(0);
+#[derive(Default)]
+struct Streams {
+    input_streams: Vec<cpal::Stream>,
+    output_streams: Vec<(OutputStream, OutputStreamHandle)>,
 }

@@ -43,8 +43,9 @@ To run maxwell-fix automatically on system startup, you can use one of the follo
 
 ## Multi-Device support
 
-This program now supports keeping alive more than one device. This is done by the use of a config. Here's how to set that up:
+This program now supports keeping more than one device alive. This is done with the use of a config. Here's how to set that up:
 
-1. Open a terminal in the location of the program and type `./maxwell-cutoff-fix --showall`. This shows all of the devices on the system
-2. For each device that you want added, type `./maxwell-cutoff-fix --add '<device name>'`. Make sure to keep the quotes `''` there and replace `<device-name>` with the actual device name.
-3. Once everything is added, go ahead and run the program
+1. Open a terminal in the location of the program and type `./maxwell-fix --edit`
+2. You will then be prompted to either add or remove a device from the config. Type `1` and press enter
+3. From the list that is displayed, choose the number of the device you want to add and press enter
+4. Once everything is added, go ahead and run the program
