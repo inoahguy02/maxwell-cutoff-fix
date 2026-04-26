@@ -37,10 +37,8 @@ impl ConfigManager {
 #[derive(Serialize, Deserialize)]
 pub struct MainConfig {
     pub devices: HashSet<String>,
-
-    // TODO: do we even need this?
-    #[serde(default = "default_num_of_kept_logs")]
     pub num_of_kept_logs: u16,
+    pub autostart: bool
 }
 
 impl MainConfig {
@@ -66,11 +64,8 @@ impl Default for MainConfig {
     fn default() -> Self {
         Self {
             devices: Default::default(),
-            num_of_kept_logs: default_num_of_kept_logs(),
+            num_of_kept_logs: 10,
+            autostart: true
         }
     }
-}
-
-fn default_num_of_kept_logs() -> u16 {
-    10
 }

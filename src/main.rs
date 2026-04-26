@@ -63,7 +63,9 @@ impl MCF {
         }
 
         // Make sure app will run on startup
-        self.enable_autorun()?; // Maybe make configurable?
+        if self.cfgmgr.cfg.borrow().autostart {
+            self.enable_autorun()?;
+        }
 
         loop {
             self.cfgmgr.reload_config()?;
